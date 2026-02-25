@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/56691739-33d5-44b2-83f6-ea68fb55e985" alt="Sift" width="100" />
+  <img src="https://github.com/user-attachments/assets/3897ee1a-bd15-4b2e-a8d1-332531e7e96e" alt="Sift" width="100" />
   <h1>Sift</h1>
   <p><strong>A personal AI assistant for students and professionals — available over iMessage, SMS, and web.</strong></p>
   <p>Text <strong>+1 (303) 994-9654</strong> to get started</p>
