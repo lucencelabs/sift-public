@@ -1,89 +1,107 @@
 <div align="center">
   <img src="https://github.com/user-attachments/assets/f54b3225-4e82-4bad-9edc-425f07fad56e" alt="Sift" width="200" />
   <h1>Sift</h1>
-  <p><strong>A personal AI assistant for students and professionals — available over iMessage, SMS, and web.</strong></p>
-  <p>Text <strong>+1 (303) 994-9654</strong> to get started</p>
+  <p><strong>Your life, on autopilot.</strong></p>
   <p>
-    <a href="https://app.usesift.app">App</a> &middot;
-    <a href="https://usesift.app">Website</a> &middot;
-    <a href="https://usesift.app/pricing">Pricing</a>
-  <br />
+    <a href="https://app.usesift.app">Web App</a> &middot;
+    <a href="https://usesift.app">Landing Page</a> &middot;
+    <a href="https://usesift.app/pricing">Pricing</a> &middot;
+    <a href="https://docs.usesift.app">User Docs</a>
+  </p>
 </div>
 
-<br />
+---
 
-Sift connects to Canvas, Google Calendar, Gmail, Slack, Notion, and more — giving students and professionals one AI assistant that tracks everything and helps them plan around it through natural conversation.
+> Text Sift: (303) 994 9654
+> 
+> Email Sift: sift@usesift.app
 
-No tab-switching. No manual entry. Just text Sift what you need.
+Sift connects to Canvas, your calendar, and your email — then keeps you on top of all of it. It texts you about the deadline you forgot, tells you what you need on the final to keep your grade, and builds your schedule around what's actually on your plate. Morning briefings, deadline reminders, study plans, grade tracking — all running in the background without you lifting a finger.
 
-## What It Does
+Text it from iMessage. Ask it anything from the web app. It plans, schedules, and follows up — so you don't have to.
 
-- **Syncs your academic life** — Canvas assignments, calendar events, Gmail, and more stay up to date automatically in the background.
-- **Plans your day** — generates time-blocked schedules around your classes, deadlines, and preferences.
-- **Works where you are** — chat on the web, over iMessage, or via SMS. Same AI, same context, every channel.
-- **Remembers you** — learns your commitments, interests, habits, preferences, and goals so suggestions improve over time.
-- **Automates the boring stuff** — daily briefings, deadline reminders, email triage, and smart notifications you can set up in plain English.
-- **Manages your tasks** — create, prioritize, and track todos alongside Canvas assignments in one place.
+## How It Works
 
-## Architecture
+- **Syncs everything** — Canvas assignments, Google Calendar, Gmail, Slack, and Notion stay current automatically. You never manually enter anything.
+- **Acts on its own** — describe what you want in plain English ("text me every morning with my schedule," "warn me 3 days before any exam") and Sift turns it into a real automation that runs on a schedule.
+- **Learns your context** — Sift builds a persistent understanding of your classes, commitments, habits, and goals. Every interaction gets smarter because it remembers what matters to you.
+- **Lives where you are** — iMessage, SMS, or web. Same AI, same memory, every channel.
+
+## Under the Hood
+
+### Native iMessage Relay
+
+Sift lives in iMessage through a custom Mac Mini relay — not a third-party wrapper or API bridge. Messages arrive as native iMessages with natural chunked delivery pacing, tapback reactions, Gemini Vision for photo attachments, and per-user privacy isolation in group chats. If the relay is unreachable, it degrades gracefully to SMS via SignalWire. This is the core product bet: the best assistant is the one you already have open.
+
+### Self-Improving Classifier
+
+Every inbound signal — emails, calendar events, Canvas updates — passes through a 3-tier classification pipeline: keyword hash lookup (~1ms), embedding similarity via pgvector (~10ms), then Gemini Flash LLM (~500ms) only if the first two tiers miss. High-confidence results feed back into the cache, so repeated patterns get faster over time. The system learns what matters to each user without any manual configuration.
+
+### Browser Sidecar
+
+A Playwright-based microservice deployed on its own Fly.io instance lets the AI agent browse the web on behalf of users — logging into Canvas portals, extracting course content, filling forms, and scraping authenticated pages. Each user gets a persistent Chromium profile so login state survives across sessions. Credentials are injected directly into the browser and never exposed to the AI agent.
+
+### Multi-Agent Orchestration
+
+A central orchestrator delegates to 15 specialized sub-agents (scheduling, email, memory, tasks, notes, browser, and more), each with isolated tool access and domain-specific prompts. 139 tools are auto-registered at class definition time. The agent runs an agentic loop with mid-processing steer signals — if you send a follow-up while it's still thinking, your message gets injected into the current iteration via Redis rather than waiting for the next turn.
+
+### Architecture
 
 ```
-Web App (React 19)  ·  iOS App (Expo)  ·  iMessage  ·  SMS
+Web App (React 19)  ·  iMessage  ·  SMS  ·  Automations
                           │
                     FastAPI Backend
                           │
               ┌───────────┼───────────┐
               │           │           │
         Orchestrator   Workers    Middleware
-        Agent (LLM)   (18 jobs)  (7 layers)
+        Agent (LLM)   (19 jobs)  (11 layers)
               │
-        10 Sub-Agents
-        100+ Tools
+        15 Sub-Agents
+        139 Tools
               │
-    ┌─────────┼─────────┐
-    │         │         │
- Supabase   Redis    External
- (Postgres  (Cache,  (Canvas, Google,
-  pgvector, Locks,   Gemini, Notion,
-  Auth)     Queues)  Slack, SignalWire)
+    ┌─────────┼─────────┐─────────┐
+    │         │         │         │
+ Supabase   Redis    External   Browser
+ (Postgres, (Cache,  (Canvas,   Sidecar
+  pgvector, Locks,   Google,    (Playwright,
+  Auth)     Queues)  Slack,     Fly.io)
+                     Notion,
+                     Stripe)
 ```
 
-### Highlights
+278K lines of Python backend. 100K lines of React frontend. 19 background workers handling everything from 30-second calendar syncs to weekly behavioral snapshots. The whole thing runs on Fly.io, a Mac Mini, and Supabase.
 
-**Hierarchical agent system** — A central orchestrator delegates to 10 specialized sub-agents (scheduling, email, memory, notes, tasks, etc.), each with isolated tool access. 100+ tools auto-registered at class definition time. Mid-processing message injection via Redis-backed steer signals lets users redirect the agent while it's still thinking.
+## Integrations
 
-**Native iMessage relay** — A custom Mac Mini HTTP relay (not a third-party wrapper) enables full bidirectional iMessage: chunked streaming with natural pacing, Gemini Vision for photo attachments, tapback reactions, per-user privacy isolation in group chats, and automatic SMS fallback via SignalWire.
-
-**3-tier classifier** — Every inbound signal (email, calendar event, Canvas update) passes through a progressive classifier: keyword hash (~1ms) → embedding similarity via pgvector (~10ms) → Gemini Flash LLM (~500ms). Results above 0.80 confidence feed back into the cache, so repeated patterns get faster over time.
-
-**18 background workers** — APScheduler jobs with Redis distributed locking, exponential backoff, and timeout enforcement. Handles calendar sync (down to 30s intervals), Canvas polling, reminder firing (~10s latency), entity graph decay, weather, email watch renewals, and more.
-
-**Real-time streaming UI** — Token-by-token chat rendering with `requestAnimationFrame` buffering at 60fps. 22 message types (schedule drafts, email drafts, thinking blocks, workflow progress) rendered via polymorphic components. Socket.IO with offline buffering and 15-attempt exponential reconnection.
-
-**Security stack** — 7 middleware layers including hierarchical rate limiting (4-level sliding window), Redis-backed idempotency, and request size gating. AES-256-GCM token encryption with PBKDF2 key derivation. Supabase Auth with row-level security on all tables.
+| Category | Services |
+|----------|----------|
+| **LMS** | Canvas (courses, assignments, grades, announcements, syllabus parsing) |
+| **Calendar** | Google Calendar (OAuth + push notifications), Outlook, ICS feeds |
+| **Email** | Gmail (OAuth + Pub/Sub push), Outlook |
+| **Messaging** | iMessage (custom relay), SMS (SignalWire) |
+| **Productivity** | Notion, Google Drive, Slack, GitHub |
+| **Payments** | Stripe, RevenueCat, Apple IAP |
+| **AI** | Claude (Anthropic), GPT-4o (OpenAI), Gemini 2.5 Flash (Google) |
+| **Browser** | Playwright sidecar (Chromium, persistent profiles, Fly.io) |
 
 ## Tech Stack
 
-| | |
-|---|---|
-| **Backend** | Python, FastAPI, 26 API routers, 40+ services, 24 repository domains |
-| **AI** | LangChain, multi-agent orchestration, pgvector semantic search, 3-tier classification pipeline |
-| **Database** | Supabase (PostgreSQL + pgvector + Row Level Security + Auth) |
-| **Cache** | Redis (Upstash) — caching, distributed locks, message queues, rate limiting |
-| **Web** | React 19, Vite, TypeScript, TailwindCSS, Radix UI, TanStack Query |
-| **Real-time** | Socket.IO with offline buffering and batched reconnection delivery |
-| **Infra** | Fly.io (backend), Vercel (web), Supabase Cloud, Upstash Redis |
-
-## Scale
-
-- ~240K lines Python backend, 192 React components, 84 custom hooks
-- 10 sub-agents, 100+ tools, 18 background workers
-- 4 channels (web, iMessage, SMS, automation) through a unified agent pipeline
-- 7 middleware layers, 9 notification channels, 9 entity graph types
+| Layer | Technology |
+|-------|-----------|
+| **Backend** | Python 3.12, FastAPI, Uvicorn |
+| **Database** | Supabase (PostgreSQL + pgvector + RLS + Auth) |
+| **Cache** | Redis (Upstash) — caching, distributed locks, message queues |
+| **Web** | React 19, Vite, TypeScript, TailwindCSS, Radix UI |
+| **Real-time** | Socket.IO (WebSocket + polling fallback) |
+| **Browser** | Playwright sidecar (Chromium, Fly.io) |
+| **Messaging** | Custom Mac Mini relay (iMessage), SignalWire (SMS) |
+| **Security** | AES-256-GCM encryption, HMAC signing, 11 middleware layers |
+| **Deployment** | Fly.io, Vercel, Supabase Cloud, Upstash |
 
 ## About
 
-Built by **[Lucence Labs](https://lucence.so)**.
+Sift is built by **[Lucence Labs](https://lucence.so)** — a Boulder-based company focused on AI systems that do real work, not just answer questions. 
 
 <div align="center">
   <sub>Sift is closed-source. Source code available upon request for recruiting purposes — conner@connergroth.com</sub>
